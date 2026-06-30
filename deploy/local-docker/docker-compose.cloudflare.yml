@@ -1,0 +1,13 @@
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:2026.6.1
+    restart: unless-stopped
+    user: "0"
+    command: tunnel --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./cloudflared-config.yml:/etc/cloudflared/config.yml:ro
+      - ${CLOUDFLARED_CREDENTIALS_DIR:-./credentials}:/etc/cloudflared/credentials:ro
+    depends_on:
+      - api-gateway
+      - admin-web
+      - user-web

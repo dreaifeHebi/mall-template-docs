@@ -1,0 +1,146 @@
+name: mall-template
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mall}
+      POSTGRES_USER: ${POSTGRES_USER:-mall}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../../../mall-backend-template/deployment/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mall} -d ${POSTGRES_DB:-mall}"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD:?set REDIS_PASSWORD}"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:?set REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  mall-admin:
+    build:
+      context: ../../../mall-backend-template/deployment
+      dockerfile: Dockerfile.admin
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      JAVA_OPTS: ${JAVA_OPTS:--Xmx320m -Xms160m -XX:MaxMetaspaceSize=128m -XX:+UseG1GC}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-mall}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-mall}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD}
+      MALL_UPLOAD_PATH: ${MALL_UPLOAD_PATH:-/data/uploads}
+      MALL_UPLOAD_URL: ${MALL_UPLOAD_URL:-/uploads}
+      MALL_DOMAIN: ${MALL_DOMAIN:-http://localhost:8090}
+      PORTAL_SERVICE_BASE_URL: http://mall-portal:8085
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:8060}
+      SPRING_MAIL_FROM: ${SPRING_MAIL_FROM:-mall@example.com}
+      SES_SMTP_HOST: ${SES_SMTP_HOST:-}
+      SES_SMTP_USERNAME: ${SES_SMTP_USERNAME:-}
+      SES_SMTP_PASSWORD: ${SES_SMTP_PASSWORD:-}
+    expose:
+      - "8080"
+    volumes:
+      - uploads_data:${MALL_UPLOAD_PATH:-/data/uploads}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  mall-portal:
+    build:
+      context: ../../../mall-backend-template/deployment
+      dockerfile: Dockerfile.portal
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      JAVA_OPTS: ${JAVA_OPTS:--Xmx320m -Xms160m -XX:MaxMetaspaceSize=128m -XX:+UseG1GC}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-mall}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-mall}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD}
+      MALL_UPLOAD_PATH: ${MALL_UPLOAD_PATH:-/data/uploads}
+      MALL_UPLOAD_URL: ${MALL_UPLOAD_URL:-/uploads}
+      MALL_DOMAIN: ${MALL_DOMAIN:-http://localhost:8060}
+      MALL_ADMIN_BASE_URL: ${MALL_ADMIN_BASE_URL:-http://mall-admin:8080}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:8060}
+      SPRING_MAIL_FROM: ${SPRING_MAIL_FROM:-mall@example.com}
+      SES_SMTP_HOST: ${SES_SMTP_HOST:-}
+      SES_SMTP_USERNAME: ${SES_SMTP_USERNAME:-}
+      SES_SMTP_PASSWORD: ${SES_SMTP_PASSWORD:-}
+      GLOBEPAY_PARTNER_CODE: ${GLOBEPAY_PARTNER_CODE:-}
+      GLOBEPAY_CREDENTIAL_CODE: ${GLOBEPAY_CREDENTIAL_CODE:-}
+      GLOBEPAY_NOTIFY_URL: ${GLOBEPAY_NOTIFY_URL:-}
+      GLOBEPAY_REDIRECT_URL: ${GLOBEPAY_REDIRECT_URL:-}
+      GLOBEPAY_CREDIT_CARD_RETURN_URL: ${GLOBEPAY_CREDIT_CARD_RETURN_URL:-}
+      GLOBEPAY_DEFAULT_CURRENCY: ${GLOBEPAY_DEFAULT_CURRENCY:-JPY}
+    expose:
+      - "8085"
+    volumes:
+      - uploads_data:${MALL_UPLOAD_PATH:-/data/uploads}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  admin-web:
+    build:
+      context: ../../../mall-admin-template
+      dockerfile: Dockerfile
+      args:
+        VITE_BASE_API: /api
+        VITE_PROXY_TARGET: http://mall-admin:8080
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:${ADMIN_WEB_PORT:-8090}:80"
+    depends_on:
+      - mall-admin
+
+  user-web:
+    build:
+      context: ../../../mall-user-template
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /portal
+        VITE_FRONTEND_BASE_URL: /
+        VITE_BACKEND_BASE_URL: /
+        VITE_PROXY_TARGET: http://mall-portal:8085
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:${USER_WEB_PORT:-8060}:80"
+    depends_on:
+      - mall-portal
+
+  api-gateway:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:${API_WEB_PORT:-8070}:80"
+    volumes:
+      - ./api-gateway.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - mall-admin
+      - mall-portal
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads_data:
