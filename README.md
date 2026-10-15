@@ -4,6 +4,8 @@ A lightweight, self-hostable online store template: a Spring Boot backend, a Vue
 
 This repository is the entry point. It explains how the pieces fit together and holds the deployment example for the whole stack.
 
+**Live demo:** [storefront](https://mall.dreaifehebi.com) · [admin console](https://admin-mall.dreaifehebi.com) (sign in with the [demo accounts](#demo-accounts))
+
 ## Repositories
 
 | Repository | What it is | Stack |
@@ -116,9 +118,9 @@ The database initializer creates these accounts:
 | --- | --- | --- | --- |
 | `demo_user` | `123456` | Storefront | Regular customer account |
 | `demo_viewer` | `123456` | Admin console | Read-only: catalog, banners, settings and email templates |
-| `admin` | `123456` | Admin console | Super admin; change this password before going public |
+| `admin` | `123456` | Admin console | Super admin of your own deployment; change this password before exposing it |
 
-Both login pages offer a one-click fill for the demo account.
+Both login pages offer a one-click fill for the demo account. On the live demo, use `demo_user` and `demo_viewer`.
 
 ## Configuration
 
@@ -168,6 +170,6 @@ The backend repository's CI builds both jars and uploads them as a workflow arti
 
 ## License
 
-This repository does not include a LICENSE file yet. For the code, see each repository: mall-backend-template and mall-admin-template are licensed under Apache-2.0.
+Licensed under the [Apache License 2.0](./LICENSE), as are the other three repositories in the set.
 
 The template set is derived from [macrozheng/mall](https://github.com/macrozheng/mall) (Apache-2.0) and its frontends [mall-admin-web](https://github.com/macrozheng/mall-admin-web) and [mall-app-web](https://github.com/macrozheng/mall-app-web). Thanks to the original authors.
