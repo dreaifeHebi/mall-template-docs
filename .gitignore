@@ -1,0 +1,11 @@
+.DS_Store
+.vscode/
+.idea/
+
+# Local deployment state.
+deploy/**/.env
+deploy/**/cloudflared-config.yml
+deploy/**/credentials/
+
+# Local-only notes can be kept beside public docs without being published.
+*.local.md
